@@ -1,12 +1,61 @@
 const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
+const http = require('http');
+const fs = require('fs');
 
 // Disable GPU sandbox warnings on Windows graphics drivers
 app.commandLine.appendSwitch('disable-gpu-sandbox');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
-// Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
+let server;
+
+function startStaticServer(distPath, callback) {
+  const mimeTypes = {
+    '.html': 'text/html',
+    '.js': 'text/javascript',
+    '.css': 'text/css',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.ico': 'image/x-icon',
+    '.ttf': 'font/ttf',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.svg': 'image/svg+xml',
+  };
+
+  server = http.createServer((req, res) => {
+    let reqUrl = req.url.split('?')[0];
+    let filePath = path.join(distPath, reqUrl);
+
+    // Default to index.html for SPA routing or missing files
+    if (filePath.endsWith('/') || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+      filePath = path.join(distPath, 'index.html');
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404);
+        res.end('404 Not Found');
+      } else {
+        res.writeHead(200, {
+          'Content-Type': contentType,
+          'Cache-Control': 'no-cache',
+        });
+        res.end(data);
+      }
+    });
+  });
+
+  server.listen(0, '127.0.0.1', () => {
+    const port = server.address().port;
+    callback(`http://127.0.0.1:${port}`);
+  });
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -25,17 +74,20 @@ function createWindow() {
     backgroundColor: '#0a0e1a',
   });
 
-  // Load the Expo web build from the dist folder
-  mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  const distPath = path.join(__dirname, '..', 'dist');
+
+  startStaticServer(distPath, (serverUrl) => {
+    mainWindow.loadURL(serverUrl);
+  });
 
   // Show window when ready to avoid white flash
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
 
-  // Open external links in the default browser
+  // Open external HTTP/HTTPS links in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http')) {
+    if (url.startsWith('http') && !url.includes('127.0.0.1')) {
       shell.openExternal(url);
       return { action: 'deny' };
     }
@@ -44,6 +96,9 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    if (server) {
+      server.close();
+    }
   });
 
   // Build application menu
@@ -55,9 +110,9 @@ function createWindow() {
           label: 'New Schedule',
           accelerator: 'CmdOrCtrl+N',
           click: () => {
-            mainWindow.webContents.executeJavaScript(
-              "window.location.hash = '#/Generator';"
-            );
+            if (mainWindow) {
+              mainWindow.webContents.executeJavaScript("window.location.hash = '#/Generator';");
+            }
           },
         },
         { type: 'separator' },
@@ -109,6 +164,9 @@ function createWindow() {
 app.on('ready', createWindow);
 
 app.on('window-all-closed', () => {
+  if (server) {
+    server.close();
+  }
   app.quit();
 });
 
