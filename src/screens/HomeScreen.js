@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   TouchableOpacity,
   FlatList,
@@ -16,6 +17,8 @@ import FeatureCard from '../components/FeatureCard';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { typography, spacing, borderRadius, shadows } from '../styles/theme';
+
+const ATG_LOGO = require('../../assets/atg_logo.jpg');
 
 const FEATURES = [
   { icon: 'sliders-h', title: 'Configurable Periods', description: 'Set custom period counts (6 to 10 per day) tailored for your school' },
@@ -66,6 +69,7 @@ const HomeScreen = ({ navigation }) => {
         {/* Hero Section */}
         <LinearGradient colors={theme.heroGradient} style={styles.hero}>
           <Animated.View style={[styles.heroContent, { opacity: fadeAnim }]}>
+            <Image source={ATG_LOGO} style={styles.heroLogo} resizeMode="contain" />
             <Text style={[styles.heroTitle, { color: theme.text }]}>
               Automatic School{'\n'}Timetable Generator
             </Text>
@@ -216,7 +220,7 @@ const HomeScreen = ({ navigation }) => {
 
         {/* Footer */}
         <View style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
-          <Text style={[styles.footerLogo, { color: theme.primary }]}>ATG</Text>
+          <Image source={ATG_LOGO} style={{ width: 100, height: 44, marginBottom: spacing.sm }} resizeMode="contain" />
           <Text style={[styles.footerText, { color: theme.textMuted }]}>
             © 2026 Automatic School Timetable Generator. All rights reserved.
           </Text>
@@ -234,6 +238,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   heroContent: { marginBottom: spacing.xxl },
+  heroLogo: {
+    width: 140,
+    height: 60,
+    marginBottom: spacing.lg,
+  },
   heroTitle: {
     fontSize: typography.fontSize.hero,
     fontWeight: typography.fontWeight.extrabold,

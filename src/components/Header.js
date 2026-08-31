@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { typography, spacing, borderRadius } from '../styles/theme';
+
+const ATG_LOGO = require('../../assets/atg_logo.jpg');
 
 const Header = ({ title, showBack, onBack, navigation }) => {
   const { isDark, toggleTheme, theme } = useTheme();
@@ -16,8 +18,8 @@ const Header = ({ title, showBack, onBack, navigation }) => {
             <Ionicons name="arrow-back" size={24} color={theme.text} />
           </TouchableOpacity>
         )}
-        <TouchableOpacity onPress={() => navigation?.navigate('Home')}>
-          <Text style={[styles.logo, { color: theme.primary }]}>ATG</Text>
+        <TouchableOpacity onPress={() => navigation?.navigate('Home')} style={styles.logoContainer}>
+          <Image source={ATG_LOGO} style={styles.logoImage} resizeMode="contain" />
         </TouchableOpacity>
         {title && (
           <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
@@ -55,10 +57,13 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
     padding: spacing.xs,
   },
-  logo: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.extrabold,
-    letterSpacing: 2,
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoImage: {
+    width: 80,
+    height: 36,
   },
   title: {
     fontSize: typography.fontSize.lg,
