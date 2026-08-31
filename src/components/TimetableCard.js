@@ -4,7 +4,7 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { typography, spacing, borderRadius, shadows } from '../styles/theme';
 
-const TimetableCard = ({ semester, classNum, grade, section, createdAt, mondayPreview, stats, onPress }) => {
+const TimetableCard = ({ semester, classNum, grade, section, createdAt, mondayPreview, stats, onPress, onDelete }) => {
   const { theme } = useTheme();
 
   const gradeName = grade || (semester ? `Grade ${semester}` : 'Grade Schedule');
@@ -40,6 +40,19 @@ const TimetableCard = ({ semester, classNum, grade, section, createdAt, mondayPr
             {sectionName}
           </Text>
         </View>
+
+        {/* Delete Button */}
+        {onDelete && (
+          <TouchableOpacity
+            style={[styles.deleteBtn, { backgroundColor: theme.error + '15' }]}
+            onPress={(e) => {
+              if (e && e.stopPropagation) e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <FontAwesome5 name="trash" size={13} color={theme.error} />
+          </TouchableOpacity>
+        )}
 
         {/* Working Hours Badge */}
         {stats && (
@@ -122,6 +135,14 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: borderRadius.sm,
     gap: 4,
+  },
+  deleteBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.xs,
   },
   hoursText: {
     fontSize: typography.fontSize.xs,

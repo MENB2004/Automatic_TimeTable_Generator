@@ -67,33 +67,60 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
-  const handleDeleteTimetable = async () => {
-    if (!selectedTimetable) return;
-    Alert.alert(
-      'Delete Schedule',
-      'Are you sure you want to delete this school schedule?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            try {
-              await set(ref(database, `users/${user.uid}/timetables/${selectedTimetable.key}`), null);
-              setModalVisible(false);
-              setSelectedTimetable(null);
-              loadTimetables();
-            } catch (error) {
-              console.error('Error deleting:', error);
-              Alert.alert('Error', 'Failed to delete schedule.');
-            } finally {
-              setDeleting(false);
-            }
+  const performDelete = async (keyToDelete) => {
+    const key = keyToDelete || selectedTimetable?.key;
+    if (!key) return;
+
+    setDeleting(true);
+    try {
+      if (user && user.uid) {
+        await set(ref(database, `users/${user.uid}/timetables/${key}`), null);
+      }
+      setTimetables((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      if (selectedTimetable && selectedTimetable.key === key) {
+        setModalVisible(false);
+        setSelectedTimetable(null);
+      }
+      if (Platform.OS === 'web') {
+        alert('Schedule deleted successfully.');
+      } else {
+        Alert.alert('Success', 'Schedule deleted successfully.');
+      }
+    } catch (error) {
+      console.error('Error deleting:', error);
+      Alert.alert('Error', 'Failed to delete schedule.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteTimetable = async (keyToDelete) => {
+    const targetKey = keyToDelete || selectedTimetable?.key;
+    if (!targetKey) return;
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to delete this school schedule?');
+      if (confirmed) {
+        await performDelete(targetKey);
+      }
+    } else {
+      Alert.alert(
+        'Delete Schedule',
+        'Are you sure you want to delete this school schedule?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => performDelete(targetKey),
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleExportPDF = async () => {
@@ -241,6 +268,7 @@ const ProfileScreen = ({ navigation }) => {
                 mondayPreview={tt.Monday}
                 stats={stats}
                 onPress={() => handleViewTimetable(key)}
+                onDelete={() => handleDeleteTimetable(key)}
               />
             );
           })
