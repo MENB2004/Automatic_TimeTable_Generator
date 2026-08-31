@@ -1,6 +1,10 @@
 const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 
+// Disable GPU sandbox warnings on Windows graphics drivers
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
 
