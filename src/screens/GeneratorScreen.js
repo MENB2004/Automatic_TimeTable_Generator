@@ -26,6 +26,9 @@ import {
   exportToCSV,
   detectLabConflicts,
   generatePDFHTML,
+  extractTeacherSchedule,
+  generateTeacherPDFHTML,
+  exportTeacherToCSV,
   DEFAULT_PERIODS_PER_DAY,
 } from '../utils/timetableAlgorithm';
 import { typography, spacing, borderRadius } from '../styles/theme';
@@ -96,8 +99,9 @@ const GeneratorScreen = ({ navigation }) => {
   const [enforceLowFreq, setEnforceLowFreq] = useState(true);
   const [enforceMaxPeriods, setEnforceMaxPeriods] = useState(true);
 
-  // Step 5: Generated timetables
+  // Step 5: Generated timetables & Teacher Exports
   const [generatedTimetables, setGeneratedTimetables] = useState({});
+  const [selectedTeacherForExport, setSelectedTeacherForExport] = useState('');
   const [saving, setSaving] = useState(false);
 
   // --- Step 1: Grades & Period Count Configuration ---
@@ -1293,6 +1297,59 @@ const GeneratorScreen = ({ navigation }) => {
           );
         })}
 
+        {/* Teacher-Wise Weekly Timetable Export Section */}
+        <View style={[styles.masterPoolCard, { backgroundColor: theme.card, borderColor: theme.cardBorder, marginTop: spacing.xl, marginBottom: spacing.base }]}>
+          <Text style={[styles.masterPoolTitle, { color: theme.primary }]}>
+            <FontAwesome5 name="user-tie" size={16} color={theme.primary} /> Download Teacher Weekly Timetable
+          </Text>
+          <Text style={{ color: theme.textSecondary, fontSize: typography.fontSize.sm, marginBottom: spacing.sm }}>
+            Select a faculty member to extract and download their personalized individual weekly workload timetable:
+          </Text>
+
+          {/* Teacher Selector Chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.facultyChips}>
+            {teachers.map((teacherName) => {
+              const activeTeacher = selectedTeacherForExport || teachers[0];
+              const isSelected = activeTeacher === teacherName;
+              return (
+                <TouchableOpacity
+                  key={teacherName}
+                  style={[
+                    styles.facultyChip,
+                    {
+                      backgroundColor: isSelected ? theme.primary : theme.surfaceElevated,
+                      borderColor: isSelected ? theme.primary : theme.border,
+                    },
+                  ]}
+                  onPress={() => setSelectedTeacherForExport(teacherName)}
+                >
+                  <Text style={{ color: isSelected ? '#fff' : theme.textSecondary, fontSize: typography.fontSize.xs, fontWeight: isSelected ? 'bold' : 'normal' }}>
+                    👨‍🏫 {teacherName}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <View style={[styles.exportBtnRow, { marginTop: spacing.base }]}>
+            <TouchableOpacity
+              style={[styles.miniExportBtn, { borderColor: theme.primary, flex: 1 }]}
+              onPress={() => handleExportTeacherCSV(selectedTeacherForExport || teachers[0])}
+            >
+              <FontAwesome5 name="file-csv" size={14} color={theme.primary} />
+              <Text style={[styles.miniExportText, { color: theme.primary }]}>Teacher CSV</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.miniExportBtn, { borderColor: theme.secondary, flex: 1, backgroundColor: theme.secondary + '15' }]}
+              onPress={() => handleExportTeacherPDF(selectedTeacherForExport || teachers[0])}
+            >
+              <FontAwesome5 name="file-pdf" size={14} color={theme.secondary} />
+              <Text style={[styles.miniExportText, { color: theme.secondary }]}>Download Teacher PDF</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {user && (
           <TouchableOpacity
             style={[styles.saveBtn, { backgroundColor: theme.success, opacity: saving ? 0.7 : 1 }]}
@@ -1320,6 +1377,64 @@ const GeneratorScreen = ({ navigation }) => {
         </View>
       </View>
     );
+  };
+
+  const handleExportTeacherPDF = async (teacherName) => {
+    if (!teacherName) return;
+    try {
+      const allList = Object.values(generatedTimetables);
+      const teacherSched = extractTeacherSchedule({
+        teacherName,
+        timetables: allList,
+      });
+
+      const html = generateTeacherPDFHTML({ teacherSchedule: teacherSched });
+
+      if (Platform.OS === 'web') {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          printWindow.focus();
+          setTimeout(() => {
+            printWindow.print();
+          }, 300);
+        } else {
+          await Print.printAsync({ html });
+        }
+        return;
+      }
+
+      const { uri } = await Print.printToFileAsync({ html });
+      if (uri) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Teacher Timetable - ${teacherName}` });
+      }
+    } catch (e) {
+      console.error('Teacher PDF export error:', e);
+      Alert.alert('Error', 'Failed to generate Teacher PDF.');
+    }
+  };
+
+  const handleExportTeacherCSV = async (teacherName) => {
+    if (!teacherName) return;
+    try {
+      const allList = Object.values(generatedTimetables);
+      const teacherSched = extractTeacherSchedule({
+        teacherName,
+        timetables: allList,
+      });
+
+      const csvData = exportTeacherToCSV({ teacherSchedule: teacherSched });
+      const filename = `${teacherName}_Weekly_Timetable.csv`.replace(/\s+/g, '_');
+
+      const { uri } = await Print.printToFileAsync({
+        html: `<pre style="font-family:monospace;padding:20px;">${csvData}</pre>`,
+      });
+      await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: `Export ${filename}` });
+    } catch (e) {
+      console.error('Teacher CSV Export Error:', e);
+      Alert.alert('Teacher CSV Export', 'Formatted teacher schedule.');
+    }
   };
 
   const handleExportCSV = async (item) => {

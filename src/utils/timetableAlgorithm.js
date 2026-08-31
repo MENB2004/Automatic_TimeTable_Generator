@@ -680,4 +680,269 @@ export function generatePDFHTML({
   `;
 }
 
+/**
+ * Extract Teacher Schedule across single or multiple section timetables
+ */
+export function extractTeacherSchedule({ teacherName, timetables }) {
+  const items = Array.isArray(timetables) ? timetables : [timetables];
+  const facultyCode = getFacultyCode(teacherName);
+
+  const teacherWeeklySchedule = {
+    Monday: [],
+    Tuesday: [],
+    Wednesday: [],
+    Thursday: [],
+    Friday: [],
+  };
+
+  let maxPeriods = DEFAULT_PERIODS_PER_DAY;
+  const assignedSubjectsMap = new Map();
+
+  items.forEach((item) => {
+    const tt = item.timetable || item;
+    const gradeLabel = item.grade || tt.grade || 'Grade Schedule';
+    const sectionLabel = item.section || tt.section || 'Section A';
+    const map = { ...(tt._teacherMap || {}), ...(item.teacherMap || {}) };
+    const pCount = tt._periodsPerDay || (tt.Monday ? tt.Monday.length : DEFAULT_PERIODS_PER_DAY);
+    if (pCount > maxPeriods) maxPeriods = pCount;
+
+    DAYS.forEach((day) => {
+      const dayPeriods = tt[day] || [];
+      if (!teacherWeeklySchedule[day]) teacherWeeklySchedule[day] = [];
+
+      dayPeriods.forEach((cellVal, pIdx) => {
+        if (!teacherWeeklySchedule[day][pIdx]) {
+          teacherWeeklySchedule[day][pIdx] = null;
+        }
+
+        const assignedTeacher = map[cellVal] || '';
+        if (assignedTeacher === teacherName && cellVal && !cellVal.includes('Free')) {
+          const entry = {
+            subject: cellVal,
+            grade: gradeLabel,
+            section: sectionLabel,
+            classLabel: `${gradeLabel} - ${sectionLabel}`,
+            subCode: getSubjectCode(cellVal),
+          };
+          teacherWeeklySchedule[day][pIdx] = entry;
+
+          const key = `${cellVal}__${gradeLabel}__${sectionLabel}`;
+          if (!assignedSubjectsMap.has(key)) {
+            assignedSubjectsMap.set(key, {
+              subject: cellVal,
+              subCode: getSubjectCode(cellVal),
+              grade: gradeLabel,
+              section: sectionLabel,
+              classLabel: `${gradeLabel} - ${sectionLabel}`,
+              periodsCount: 1,
+            });
+          } else {
+            assignedSubjectsMap.get(key).periodsCount += 1;
+          }
+        }
+      });
+    });
+  });
+
+  let totalTeachingPeriods = 0;
+  DAYS.forEach((day) => {
+    for (let p = 0; p < maxPeriods; p++) {
+      if (!teacherWeeklySchedule[day][p]) {
+        teacherWeeklySchedule[day][p] = { subject: 'Free', isFree: true };
+      } else {
+        totalTeachingPeriods++;
+      }
+    }
+  });
+
+  return {
+    teacherName,
+    facultyCode,
+    schedule: teacherWeeklySchedule,
+    periodsPerDay: maxPeriods,
+    totalTeachingPeriods,
+    totalHours: (totalTeachingPeriods * 0.75).toFixed(1),
+    assignedSubjects: Array.from(assignedSubjectsMap.values()),
+  };
+}
+
+/**
+ * Generate PDF HTML for Individual Teacher Weekly Timetable (matching Image 2 style)
+ */
+export function generateTeacherPDFHTML({ teacherSchedule }) {
+  const { teacherName, facultyCode, schedule, periodsPerDay, totalTeachingPeriods, totalHours, assignedSubjects } = teacherSchedule;
+  const periodIndices = Array.from({ length: periodsPerDay }, (_, i) => i);
+  const lunchAfterPeriod = Math.floor(periodsPerDay / 2);
+
+  let headerCols = `<th style="border:1.5px solid #000;background:#e0e0e0;padding:10px;text-align:center;width:75px;font-size:13px;font-weight:bold;"></th>`;
+  periodIndices.forEach((pIdx) => {
+    headerCols += `<th style="border:1.5px solid #000;background:#e0e0e8;padding:10px;text-align:center;font-size:14px;font-weight:bold;">${pIdx + 1}</th>`;
+    if (pIdx + 1 === lunchAfterPeriod) {
+      headerCols += `<th style="border:1.5px solid #000;background:#e0e0e8;padding:10px;text-align:center;font-size:12px;font-weight:bold;width:32px;">LUNCH</th>`;
+    }
+  });
+
+  let bodyRows = '';
+  const dayAbbrs = { Monday: 'MON', Tuesday: 'TUE', Wednesday: 'WED', Thursday: 'THUR', Friday: 'FRI' };
+
+  DAYS.forEach((day, dayIdx) => {
+    bodyRows += '<tr>';
+    bodyRows += `<td style="border:1.5px solid #000;background:#e0e0e8;font-weight:bold;text-align:center;padding:12px;font-size:13px;">${dayAbbrs[day] || day}</td>`;
+
+    const dayPeriods = schedule[day] || [];
+    let p = 0;
+
+    while (p < periodsPerDay) {
+      const slot = dayPeriods[p] || { isFree: true, subject: 'Free' };
+
+      let span = 1;
+      if (!slot.isFree) {
+        while (
+          p + span < periodsPerDay &&
+          p + span + 1 !== lunchAfterPeriod + 1 &&
+          dayPeriods[p + span] &&
+          !dayPeriods[p + span].isFree &&
+          dayPeriods[p + span].subject === slot.subject &&
+          dayPeriods[p + span].classLabel === slot.classLabel
+        ) {
+          span++;
+        }
+      }
+
+      let cellDisplay = '';
+      if (slot.isFree) {
+        cellDisplay = 'FREE / PREP';
+      } else {
+        const subCode = slot.subCode || getSubjectCode(slot.subject);
+        cellDisplay = `${subCode}<br/><span style="font-size:11px;font-weight:normal;">(${slot.classLabel})</span>`;
+      }
+
+      const bgStyle = slot.isFree ? 'background:#fff;' : 'background:#e3f2fd;';
+      bodyRows += `<td colspan="${span}" style="border:1.5px solid #000;${bgStyle}padding:10px 4px;text-align:center;vertical-align:middle;font-weight:bold;font-size:12px;line-height:1.3;">${cellDisplay}</td>`;
+
+      if (p + span - 1 + 1 === lunchAfterPeriod) {
+        if (dayIdx === 0) {
+          bodyRows += `
+            <td rowspan="5" style="border:1.5px solid #000;background:#fafafa;text-align:center;vertical-align:middle;font-weight:bold;font-size:12px;letter-spacing:2px;padding:4px;writing-mode:vertical-rl;transform:rotate(180deg);">
+              L U N C H &nbsp; B R E A K
+            </td>
+          `;
+        }
+      }
+
+      p += span;
+    }
+
+    bodyRows += '</tr>';
+  });
+
+  let rosterRows = '';
+  assignedSubjects.forEach((info) => {
+    rosterRows += `
+      <tr>
+        <td style="border:1.5px solid #000;padding:8px 10px;text-align:center;font-weight:bold;font-size:12px;">${info.subCode}</td>
+        <td style="border:1.5px solid #000;padding:8px 10px;font-weight:bold;font-size:12px;">${info.subject.toUpperCase()}</td>
+        <td style="border:1.5px solid #000;padding:8px 10px;text-align:center;font-weight:bold;font-size:12px;">${info.classLabel.toUpperCase()}</td>
+        <td style="border:1.5px solid #000;padding:8px 10px;text-align:center;font-weight:bold;font-size:12px;">${info.periodsCount} periods/wk (${(info.periodsCount * 0.75).toFixed(1)} hrs)</td>
+      </tr>
+    `;
+  });
+
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Teacher Timetable - ${teacherName}</title>
+        <style>
+          @page { size: A4 landscape; margin: 15mm; }
+          body { font-family: Arial, Helvetica, sans-serif; color: #000; background: #fff; margin: 0; padding: 12px; }
+          .faculty-bar { font-size: 15px; font-weight: bold; margin-bottom: 8px; color: #000; display: flex; justify-content: space-between; }
+          table.grid { width: 100%; border-collapse: collapse; border: 2px solid #000; table-layout: fixed; margin-bottom: 24px; }
+          table.grid th, table.grid td { border: 1.5px solid #000; }
+          table.roster { width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 12px; }
+          table.roster th { border: 1.5px solid #000; background: #d6d6d6; color: #000; text-align: center; padding: 8px; font-weight: bold; }
+          table.roster td { border: 1.5px solid #000; padding: 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="faculty-bar">
+          <div>Faculty Member: ${teacherName.toUpperCase()} (${facultyCode})</div>
+          <div>Weekly Teaching Load: ${totalTeachingPeriods} Periods (${totalHours} hrs/wk)</div>
+        </div>
+
+        <table class="grid">
+          <thead>
+            <tr>${headerCols}</tr>
+          </thead>
+          <tbody>
+            ${bodyRows}
+          </tbody>
+        </table>
+
+        ${
+          assignedSubjects.length > 0
+            ? `
+          <table class="roster">
+            <thead>
+              <tr>
+                <th style="width:15%;">SUB CODE</th>
+                <th style="width:40%;">COURSE / LAB NAME</th>
+                <th style="width:25%;">ASSIGNED CLASS & SECTION</th>
+                <th style="width:20%;">WEEKLY WORKLOAD</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rosterRows}
+            </tbody>
+          </table>
+        `
+            : ''
+        }
+      </body>
+    </html>
+  `;
+}
+
+/**
+ * Export Teacher Schedule to CSV string
+ */
+export function exportTeacherToCSV({ teacherSchedule }) {
+  const { teacherName, facultyCode, schedule, periodsPerDay, totalTeachingPeriods, totalHours } = teacherSchedule;
+  let csv = `Teacher Weekly Workload Schedule,"${teacherName} (${facultyCode})"\n`;
+  csv += `Total Teaching Workload,${totalTeachingPeriods} Periods/week (${totalHours} hrs/week)\n\n`;
+
+  const periodIndices = Array.from({ length: periodsPerDay }, (_, i) => i);
+  const lunchAfterPeriod = Math.floor(periodsPerDay / 2);
+
+  let header = 'Day';
+  periodIndices.forEach((pIdx) => {
+    header += `,Period ${pIdx + 1}`;
+    if (pIdx + 1 === lunchAfterPeriod) {
+      header += `,"-- Lunch Break --"`;
+    }
+  });
+  csv += `${header}\n`;
+
+  DAYS.forEach((day) => {
+    let row = day;
+    const dayPeriods = schedule[day] || [];
+    periodIndices.forEach((pIdx) => {
+      const slot = dayPeriods[pIdx] || { isFree: true, subject: 'Free' };
+      if (slot.isFree) {
+        row += `,"Free / Prep"`;
+      } else {
+        row += `,"${slot.subject} (${slot.classLabel})"`;
+      }
+
+      if (pIdx + 1 === lunchAfterPeriod) {
+        row += `,"-- Lunch Break --"`;
+      }
+    });
+    csv += `${row}\n`;
+  });
+
+  return csv;
+}
+
 

@@ -21,7 +21,16 @@ import Header from '../components/Header';
 import TimetableCard from '../components/TimetableCard';
 import TimetableView from '../components/TimetableView';
 import { typography, spacing, borderRadius, shadows } from '../styles/theme';
-import { DAYS, exportToCSV, calculateWorkingHours, DEFAULT_PERIODS_PER_DAY, generatePDFHTML, generateTimeSlots } from '../utils/timetableAlgorithm';
+import {
+  DAYS,
+  exportToCSV,
+  calculateWorkingHours,
+  DEFAULT_PERIODS_PER_DAY,
+  generatePDFHTML,
+  generateTimeSlots,
+  extractTeacherSchedule,
+  generateTeacherPDFHTML,
+} from '../utils/timetableAlgorithm';
 
 const ProfileScreen = ({ navigation }) => {
   const { theme } = useTheme();
@@ -120,6 +129,40 @@ const ProfileScreen = ({ navigation }) => {
           },
         ]
       );
+    }
+  };
+
+  const handleExportTeacherPDF = async (teacherName) => {
+    if (!selectedTimetable || !teacherName) return;
+    try {
+      const teacherSched = extractTeacherSchedule({
+        teacherName,
+        timetables: [selectedTimetable.data],
+      });
+      const html = generateTeacherPDFHTML({ teacherSchedule: teacherSched });
+
+      if (Platform.OS === 'web') {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          printWindow.focus();
+          setTimeout(() => {
+            printWindow.print();
+          }, 300);
+        } else {
+          await Print.printAsync({ html });
+        }
+        return;
+      }
+
+      const { uri } = await Print.printToFileAsync({ html });
+      if (uri) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Teacher Schedule - ${teacherName}` });
+      }
+    } catch (e) {
+      console.error('Teacher PDF error:', e);
+      Alert.alert('Error', 'Failed to generate Teacher PDF.');
     }
   };
 
@@ -292,20 +335,18 @@ const ProfileScreen = ({ navigation }) => {
                   {selectedTimetable.data.grade || `Grade ${selectedTimetable.data.semester || 1}`} —{' '}
                   {selectedTimetable.data.section || `Section ${selectedTimetable.data.class || 'A'}`}
                 </Text>
-
                 <TimetableView
                   timetable={selectedTimetable.data}
                   grade={selectedTimetable.data.grade}
                   section={selectedTimetable.data.section}
                 />
-
                 <View style={styles.modalActions}>
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: theme.primary }]}
                     onPress={handleExportPDF}
                   >
                     <FontAwesome5 name="file-pdf" size={14} color="#fff" />
-                    <Text style={styles.actionBtnText}>Export PDF</Text>
+                    <Text style={styles.actionBtnText}>Export Class PDF</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -318,7 +359,7 @@ const ProfileScreen = ({ navigation }) => {
 
                   <TouchableOpacity
                     style={[styles.deleteBtn, { backgroundColor: theme.error }]}
-                    onPress={handleDeleteTimetable}
+                    onPress={() => handleDeleteTimetable()}
                     disabled={deleting}
                   >
                     {deleting ? (
@@ -331,6 +372,38 @@ const ProfileScreen = ({ navigation }) => {
                     )}
                   </TouchableOpacity>
                 </View>
+
+                {/* Extract Individual Teacher Timetables */}
+                {(() => {
+                  const teacherMap = selectedTimetable.data._teacherMap || {};
+                  const teachersInSchedule = Array.from(new Set(Object.values(teacherMap))).filter(Boolean);
+                  if (teachersInSchedule.length === 0) return null;
+
+                  return (
+                    <View style={{ marginTop: spacing.sm, marginBottom: spacing.xl, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: spacing.base }}>
+                      <Text style={[styles.modalSubtitle, { color: theme.text, fontWeight: typography.fontWeight.bold, marginBottom: spacing.xs }]}>
+                        👨‍🏫 Download Teacher Weekly Timetable:
+                      </Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {teachersInSchedule.map((tName) => (
+                          <TouchableOpacity
+                            key={tName}
+                            style={[
+                              styles.actionBtn,
+                              { backgroundColor: theme.primary + '15', borderWidth: 1, borderColor: theme.primary, marginRight: spacing.xs, paddingHorizontal: 12, paddingVertical: 8 },
+                            ]}
+                            onPress={() => handleExportTeacherPDF(tName)}
+                          >
+                            <FontAwesome5 name="user-tie" size={12} color={theme.primary} />
+                            <Text style={[styles.actionBtnText, { color: theme.primary, fontSize: typography.fontSize.xs, marginLeft: 4 }]}>
+                              {tName} PDF
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  );
+                })()}
               </ScrollView>
             )}
           </View>
