@@ -226,20 +226,34 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        onPress: async () => {
-          try {
-            await signOut(auth);
-          } catch (error) {
-            console.error('Logout error:', error);
-          }
+  const performLogout = async () => {
+    try {
+      await signOut(auth);
+      if (navigation && navigation.navigate) {
+        navigation.navigate('Login');
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      Alert.alert('Error', 'Failed to logout.');
+    }
+  };
+
+  const handleLogout = async () => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to logout?');
+      if (confirmed) {
+        await performLogout();
+      }
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: performLogout,
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   const timetableKeys = Object.keys(timetables);
