@@ -2,6 +2,8 @@
   "name": "atg-timetable-rn",
   "version": "1.0.0",
   "main": "index.js",
+  "author": "ATG Timetable Generator",
+  "description": "ATG - Automatic School Timetable Generator. Smart, constraint-based timetable scheduling for schools.",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "^3.1.1",
@@ -25,10 +27,55 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:web": "npx expo export --platform web",
+    "electron:dev": "npm run build:web && electron electron/main.js",
+    "electron:build": "npm run build:web && electron-builder --win --publish never"
+  },
+  "build": {
+    "appId": "com.atg.timetable",
+    "productName": "ATG Timetable Generator",
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "assets/icon.png",
+      "assets/atg_logo.jpg"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ATG Timetable Generator"
+    }
   },
   "private": true,
   "devDependencies": {
-    "babel-preset-expo": "^57.0.9"
+    "babel-preset-expo": "^57.0.9",
+    "electron": "^22.3.27",
+    "electron-builder": "^24.13.3"
   }
 }

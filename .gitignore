@@ -1,10 +1,15 @@
 # dependencies
 /node_modules
 
-# Expo
+# Expo & Electron builds
 .expo/
 dist/
 web-build/
+release/
+*.exe
+*.zip
+*.asar
+*.7z
 
 # Native
 *.orig.*
