@@ -3,9 +3,13 @@ const path = require('path');
 const http = require('http');
 const fs = require('fs');
 
-// Disable GPU sandbox warnings on Windows graphics drivers
+// Disable GPU sandbox warnings and diagnostic logging on Windows graphics drivers
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-gpu-rasterization');
 app.commandLine.appendSwitch('disable-gpu-sandbox');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('log-level', '3');
 
 let mainWindow;
 let server;
