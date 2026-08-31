@@ -190,33 +190,6 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Contact Section */}
-        <View style={[styles.section, { backgroundColor: theme.surface }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Get In Touch</Text>
-          <View style={styles.contactItems}>
-            {[
-              { icon: 'envelope', text: 'support@atg-timetable.com' },
-              { icon: 'phone', text: '+1 (555) 123-4567' },
-              { icon: 'map-marker-alt', text: '123 Education Ave, Learning City' },
-            ].map((item, i) => (
-              <View key={i} style={styles.contactItem}>
-                <FontAwesome5 name={item.icon} size={16} color={theme.primary} />
-                <Text style={[styles.contactText, { color: theme.textSecondary }]}>{item.text}</Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.socialLinks}>
-            {['facebook-f', 'twitter', 'linkedin-in', 'github'].map((icon, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[styles.socialButton, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}
-              >
-                <FontAwesome5 name={icon} size={18} color={theme.primary} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
 
         {/* Footer */}
         <View style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
